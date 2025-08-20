@@ -1,9 +1,7 @@
-name: AI Agent (tasks → code → PR via MCP)
+name: AI Agent (manual via MCP)
 
 on:
-  push:
-    paths:
-      - "tasks/**"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,7 +14,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node (for MCP GitHub server via npx)
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20.x"
@@ -26,16 +24,29 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps
+      - name: Install Python deps
         run: pip install -r requirements.txt
 
-      - name: Run agent (all ops via MCP)
+      - name: Install and build MCP (Node)
+        working-directory: mcp_node
+        run: |
+          npm ci || npm i
+          npx tsc -p tsconfig.json
+
+      - name: Start MCP server (Node)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PORT: 8081
+        run: |
+          node mcp_node/dist/server.js &
+          for i in {1..30}; do curl -fsS http://127.0.0.1:8081/capabilities && break || sleep 1; done
+
+      - name: Run agent via MCP
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-5
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MCP_SERVER: http://localhost:8080
+          MCP_SERVER: http://127.0.0.1:8081
           BASE_BRANCH: ${{ github.ref_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python agent/agent_mcp_github.py

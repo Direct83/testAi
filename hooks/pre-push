@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Git Bash friendly pre-push hook.
+# Триггерит локального агента, если в пуше есть изменения в tasks/.
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+# Подтянем переменные из .env, если есть
+if [ -f .env ]; then
+  # shellcheck disable=SC2046
+  export $(grep -E '^(OPENAI_API_KEY|OPENAI_MODEL|GITHUB_TOKEN|GITHUB_REPOSITORY|BASE_BRANCH|MCP_SERVER|HEAD_BRANCH_PREFIX)=' .env | xargs -0 -I {} echo {} ) 2>/dev/null || true
+fi
+
+# Значения по умолчанию
+: "${MCP_SERVER:=http://127.0.0.1:8081}"
+
+# Определяем диапазон коммитов, который пушится
+upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || true)
+if [ -n "$upstream" ]; then
+  RANGE="$upstream..HEAD"
+else
+  RANGE="HEAD~5..HEAD" # fallback
+fi
+
+changed=$(git diff --name-only $RANGE | grep -E '^tasks/' || true)
+if [ -z "$changed" ]; then
+  exit 0
+fi
+
+echo "[pre-push] tasks/ changed. Running agent via MCP: $MCP_SERVER"
+
+"${PYTHON:-python}" agent/agent_mcp_github.py || {
+  echo "[pre-push] Agent failed. Canceling push." >&2
+  exit 1
+}
+
+exit 0
+
+
