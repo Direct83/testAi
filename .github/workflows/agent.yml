@@ -21,10 +21,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps (agent only)
-        run: pip install -r requirements-agent.txt
+      - name: Install deps
+        run: pip install -r requirements.txt
 
       - name: Run agent (generate code)
+        id: agent
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-5
@@ -43,6 +44,8 @@ jobs:
           branch: ai-generated/${{ github.run_id }}
           base: ${{ github.ref_name }}
           add-paths: |
+            ${{ steps.agent.outputs.generated_file }}
+            *.py
             **/*.py
             README.md
             tests/**
