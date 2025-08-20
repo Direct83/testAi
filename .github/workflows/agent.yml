@@ -1,4 +1,4 @@
-name: AI Agent (tasks → code → PR)
+name: AI Agent (tasks → code → PR via MCP)
 
 on:
   push:
@@ -10,11 +10,16 @@ permissions:
   pull-requests: write
 
 jobs:
-  generate-and-pr:
+  mcp-agent:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node (for MCP GitHub server via npx)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -24,30 +29,14 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: Run agent (generate code)
-        id: agent
+      - name: Run agent (all ops via MCP)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: gpt-5
-        run: python agent/agent.py
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(agent): add AI-generated script from tasks"
-          title: "AI: сгенерированный скрипт из tasks/task1.md"
-          body: |
-            Этот PR создан автоматически агентом.
-            Источник задания: `tasks/task1.md`.
-            #ai-generated
-          branch: ai-generated/${{ github.run_id }}
-          base: ${{ github.ref_name }}
-          add-paths: |
-            ${{ steps.agent.outputs.generated_file }}
-            *.py
-            **/*.py
-            README.md
-            tests/**
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python agent/agent_mcp_github.py
 
 
