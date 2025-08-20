@@ -1,0 +1,29 @@
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Test/coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project outputs
+output/
+
