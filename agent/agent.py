@@ -36,8 +36,7 @@ def generate_code(task_text: str, model: str, api_key: str) -> Tuple[str, str]:
     )
     resp = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
+        messages=[{"role": "user", "content": prompt}]
     )
     raw = resp.choices[0].message.content or ""
     return out_name, strip_code_fences(raw)
