@@ -10,6 +10,23 @@
 - Вы меняете `tasks/task1.md`, коммитите и делаете `git push`.
 - Перед пушем срабатывает локальный git‑hook `hooks/pre-push`: он запускает `agent/agent_mcp_github.py` через ваш MCP, и агент создаёт ветку и PR в GitHub. При ошибке push отменяется.
 
+### Быстрый старт
+```bash
+# 1) MCP (Node)
+docker build -t mcp-github -f mcp_node/Dockerfile mcp_node
+docker run -d --name mcp-github-local --rm -p 8081:8080 -e GITHUB_TOKEN="<ваш_PAT>" mcp-github:latest
+
+# 2) Переменные окружения (Git Bash)
+export OPENAI_API_KEY=sk-...
+export GITHUB_REPOSITORY=Direct83/testAi
+export BASE_BRANCH=main
+export MCP_SERVER=http://127.0.0.1:8081
+
+# 3) Измените tasks/task1.md → коммит/пуш
+git add tasks/task1.md && git commit -m "docs: update task" && git push
+# при push локальный pre-push хук запустит агента и создаст PR
+```
+
 ### Требования
 - Python 3.11+
 - Node.js 20+ (для запуска MCP‑сервера через `npx` или локального HTTP MCP)
