@@ -2,6 +2,9 @@ import os, re, pathlib, sys
 from typing import Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
+# Обеспечиваем корректный импорт при запуске как скрипт: `python agent/agent_mcp_github.py`
+if __package__ is None or __package__ == "":
+    sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from agent.mcp_client import MCPClient
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
