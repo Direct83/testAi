@@ -59,8 +59,12 @@ def main():
         print("ERROR: GITHUB_REPOSITORY is not set", file=sys.stderr); sys.exit(4)
     owner, repo = repo_full.split("/", 1)
     base_branch = os.getenv("BASE_BRANCH", os.getenv("GITHUB_REF_NAME","main"))
-    run_id = os.getenv("GITHUB_RUN_ID", "local")
-    head_branch = f"ai-mcp-{run_id}"
+    # Уникальная ветка на каждый запуск, чтобы избежать 422 (PR уже существует)
+    import time, random
+    prefix = os.getenv("HEAD_BRANCH_PREFIX", "ai-mcp")
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    rand = random.randint(1000, 9999)
+    head_branch = f"{prefix}-{ts}-{rand}"
 
     # Приоритет: HTTP MCP сервер (локально в Docker) если MCP_SERVER задан,
     # иначе fallback на server-github через npx (stdio MCP).
