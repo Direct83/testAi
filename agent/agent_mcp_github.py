@@ -6,6 +6,7 @@ from openai import OpenAI
 if __package__ is None or __package__ == "":
     sys.path.append(str(pathlib.Path(__file__).resolve().parents[1]))
 from agent.mcp_client import MCPClient
+from agent.mcp_http_client import MCPHttpClient
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -61,28 +62,52 @@ def main():
     run_id = os.getenv("GITHUB_RUN_ID", "local")
     head_branch = f"ai-mcp-{run_id}"
 
-    # Запускаем GitHub MCP server через npx; токен Actions маппим в ожидаемую переменную
+    # Приоритет: HTTP MCP сервер (локально в Docker) если MCP_SERVER задан,
+    # иначе fallback на server-github через npx (stdio MCP).
+    mcp_server = os.getenv("MCP_SERVER")
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("GITHUB_PERSONAL_ACCESS_TOKEN")
     if not token:
         print("ERROR: GITHUB_TOKEN is missing", file=sys.stderr); sys.exit(5)
 
-    mcp = MCPClient(
-        command="npx",
-        args=["-y", "@modelcontextprotocol/server-github"],
-        env={"GITHUB_PERSONAL_ACCESS_TOKEN": token}
-    )
+    if mcp_server:
+        # HTTP MCP (строгий режим, без fallback)
+        http = MCPHttpClient(mcp_server, github_token=token)
+        caps = http.capabilities()
+        print("[agent] MCP capabilities:", caps)
+        try:
+            tools_list = http.tools_list()
+            print("[agent] MCP tools:", tools_list)
+        except Exception:
+            tools_list = {}
 
-    try:
-        # 1) создаём ветку от base (если её нет)
-        mcp.tools_call("create_branch", {
+        tools = []
+        if isinstance(caps, dict) and caps.get("tools"):
+            tools = caps["tools"]
+        elif isinstance(tools_list, dict) and tools_list.get("tools"):
+            tools = tools_list["tools"]
+
+        t_create_branch = "create_branch"
+        t_update_file = "create_or_update_file"
+        t_create_pr = "create_pull_request"
+        for t in tools:
+            name = t if isinstance(t, str) else t.get("name")
+            if not name:
+                continue
+            nlow = str(name).lower()
+            if "branch" in nlow and "create" in nlow:
+                t_create_branch = name
+            if ("file" in nlow or "content" in nlow) and ("update" in nlow or "create" in nlow):
+                t_update_file = name
+            if ("pr" in nlow or "pull" in nlow) and "create" in nlow:
+                t_create_pr = name
+
+        http.tools_call(t_create_branch, {
             "owner": owner,
             "repo": repo,
             "branch": head_branch,
             "from_branch": base_branch
         })
-
-        # 2) кладём (создаём/обновляем) файл в ветке
-        mcp.tools_call("create_or_update_file", {
+        http.tools_call(t_update_file, {
             "owner": owner,
             "repo": repo,
             "path": out_name,
@@ -90,21 +115,21 @@ def main():
             "message": f"feat(agent): add {out_name} from tasks",
             "branch": head_branch
         })
-
-        # 3) создаём PR
-        pr = mcp.tools_call("create_pull_request", {
+        pr = http.tools_call(t_create_pr, {
             "owner": owner,
             "repo": repo,
             "title": f"AI: {out_name} из tasks/task1.md",
-            "body": "PR создан агентом через MCP GitHub server. #ai-generated",
+            "body": "PR создан агентом через MCP GitHub server (HTTP). #ai-generated",
             "head": head_branch,
             "base": base_branch,
             "draft": False
         })
         print("PR created:", pr)
+        return
 
-    finally:
-        mcp.close()
+    # Если MCP_SERVER не задан — сообщаем явно
+    print("ERROR: MCP_SERVER не задан. Задайте MCP_SERVER=http://localhost:8080 и запустите снова.")
+    sys.exit(7)
 
     # публикуем имя файла в GHA outputs (на всякий)
     go = os.environ.get("GITHUB_OUTPUT")

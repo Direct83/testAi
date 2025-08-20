@@ -1,0 +1,23 @@
+{
+    "name": "mcp-github-server",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "start": "node dist/server.js",
+        "dev": "node --loader ts-node/esm src/server.ts"
+    },
+    "dependencies": {
+        "@octokit/rest": "^21.0.2",
+        "body-parser": "^1.20.2",
+        "dotenv": "^16.4.5",
+        "express": "^4.19.2"
+    },
+    "devDependencies": {
+        "@types/body-parser": "^1.19.6",
+        "@types/express": "^5.0.3",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.5.4"
+    }
+}
