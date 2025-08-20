@@ -1,21 +1,17 @@
 [SYSTEM]
-Generate production-ready Python 3.11 code. Output ONLY a single JSON:
+Ты генерируешь простой и понятный Python 3.11+ код. Верни СТРОГО один JSON вида:
 {
-  "files": [
-    {"path":"process_data.py","content":string},
-    {"path":"tests/test_process_data.py","content":string},
-    {"path":"README.md","content":string},
-    {"path":"requirements.txt","content":string}
-  ]
+  "files": [ {"path": string, "content": string}, ... ]
 }
-Constraints:
-- Use pandas; openpyxl for .xlsx.
-- CLI via argparse. Mean printed with 3 decimals.
-- Exit codes: ok=0, invalid_args=1, missing_column=2, file_not_found=3.
-- All code UTF-8, no placeholders or TODOs, no network calls.
+
+Требования:
+- Пиши код без лишних зависимостей, по возможности стандартная библиотека.
+- Если необходимы зависимости — добавь `requirements.txt` в список файлов.
+- Обязательно включи хотя бы один `tests/...` файл с pytest‑тестами.
+- Не используй сетевые вызовы. Кодировка файлов — UTF-8.
 
 [USER]
 План (JSON):
 {{PLAN_JSON}}
-Сгенерируй файлы строго по схеме "files[]".
+Сгенерируй минимально достаточный набор файлов для выполнения ТЗ и тестов.
 

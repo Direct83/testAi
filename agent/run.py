@@ -14,11 +14,12 @@ OUTPUT = ROOT / "output"
 TASKS = ROOT / "tasks"
 
 class Plan(BaseModel):
-    steps: List[str]
-    libraries: List[str]
-    edge_cases: List[str]
-    tests: List[Dict[str, str]]
-    cli: Dict[str, Any]
+    name: str | None = None
+    summary: str | None = None
+    steps: List[str] | None = None
+    files: List[Dict[str, str]] | None = None
+    tests: List[Dict[str, str]] | None = None
+    cli: Dict[str, Any] | None = None
 
 class FilesPack(BaseModel):
     files: List[Dict[str, str]]
@@ -31,7 +32,7 @@ def render_prompt(path: pathlib.Path, **vars) -> str:
 
 def ask(client: OpenAI, content: str) -> str:
     resp = client.chat.completions.create(
-        model=os.environ.get("OPENAI_MODEL","gpt-5"),
+        model=os.environ.get("OPENAI_MODEL","gpt-4o-mini"),
         messages=[{"role":"user","content":content}]
     )
     return resp.choices[0].message.content or ""
@@ -48,13 +49,13 @@ def main():
 
     raw_tz = (TASKS / "task1.md").read_text(encoding="utf-8")
 
-    # Релиз 0: анализ ТЗ → plan.json
+    # Шаг 1: анализ ТЗ → plan.json
     analyze = render_prompt(PROMPTS / "analyze.md", RAW_TZ=raw_tz)
     plan_text = ask(client, analyze)
     plan = Plan.model_validate_json(plan_text)
     (OUTPUT / "plan.json").write_text(json.dumps(plan.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8")
 
-    # Релиз 1: генерация кода → файлы
+    # Шаг 2: генерация кода → файлы
     codegen = render_prompt(PROMPTS / "codegen.md", PLAN_JSON=plan.model_dump_json())
     files_json = ask(client, codegen)
     pack = FilesPack.model_validate_json(files_json)
@@ -64,11 +65,11 @@ def main():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(f["content"], encoding="utf-8")
 
-    # Установка зависимостей и pytest локально (без MCP) для надёжности
+    # Шаг 3: зависимости и pytest локально
     subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], cwd=str(ROOT), check=False)
     subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=str(ROOT), check=False)
 
-    # Релиз 2: ветка/коммит/push/PR через gh (можно пропустить через SKIP_PR=1)
+    # Шаг 4: ветка/коммит/push/PR через gh (можно пропустить через SKIP_PR=1)
     if os.environ.get("SKIP_PR", "0") != "1":
         branch = os.environ.get("GIT_BRANCH","feat/excel-mean-agent")
         base = os.environ.get("BASE_BRANCH","main")
@@ -81,8 +82,9 @@ def main():
             bash.exec(f"git push --set-upstream origin {branch}", cwd=str(ROOT))
 
             file_list = ", ".join([f['path'] for f in pack.files])
-            run_cmd = "python process_data.py --input sample.xlsx --column Price"
-            tests_list = "\n".join([f"- {t.get('name','test')}" for t in plan.tests])
+            # Если план содержит CLI, возьмём команду, иначе оставим пустую
+            run_cmd = (plan.cli or {}).get("command", "python -m pytest -q")
+            tests_list = "\n".join([f"- {t.get('name','test')}" for t in (plan.tests or [])])
 
             pr_prompt = render_prompt(PROMPTS / "pr.md",
                                       RAW_TZ=raw_tz,
@@ -92,7 +94,7 @@ def main():
             pr_body = ask(client, pr_prompt)
             (OUTPUT / "pr_body.txt").write_text(pr_body, encoding="utf-8")
 
-            title = "feat: Excel mean script (agent-generated)"
+            title = plan.name or "feat: AI-generated changes"
             bash.exec(f'gh pr create --title "{title}" --body-file output/pr_body.txt --base {base} --head {branch}', cwd=str(ROOT))
         finally:
             bash.close()
