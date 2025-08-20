@@ -16,6 +16,19 @@ fi
 # Значения по умолчанию
 : "${MCP_SERVER:=http://127.0.0.1:8081}"
 
+echo "[pre-push] MCP_SERVER=${MCP_SERVER}"
+# Если текущий MCP_SERVER недоступен — пробуем типовые локальные адреса
+if ! curl -fsS "${MCP_SERVER}/capabilities" >/dev/null 2>&1; then
+  for candidate in http://127.0.0.1:8081 http://localhost:8081; do
+    if curl -fsS "${candidate}/capabilities" >/dev/null 2>&1; then
+      MCP_SERVER="$candidate"
+      export MCP_SERVER
+      echo "[pre-push] MCP_SERVER fallback -> ${MCP_SERVER}"
+      break
+    fi
+  done
+fi
+
 # Определяем диапазон коммитов, который пушится
 upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || true)
 if [ -n "$upstream" ]; then
