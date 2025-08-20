@@ -1,52 +1,37 @@
 import json
-import sys
-
-
-INPUT_FILE = "data.json"
-OUTPUT_FILE = "names.txt"
-
-
-def extract_names(data):
-    names = []
-    for item in data:
-        if isinstance(item, dict) and "name" in item and item["name"] is not None:
-            names.append(str(item["name"]))
-    return names
+from pathlib import Path
 
 
 def main():
+    data_file = Path('data.json')
+    output_file = Path('names.txt')
+
     try:
-        with open(INPUT_FILE, "r", encoding="utf-8-sig") as f:
+        with data_file.open('r', encoding='utf-8') as f:
             data = json.load(f)
-    except FileNotFoundError:
-        sys.stderr.write(f"Ошибка: файл '{INPUT_FILE}' не найден.\n")
-        return 1
-    except json.JSONDecodeError as e:
-        sys.stderr.write(f"Ошибка: некорректный JSON в '{INPUT_FILE}': {e}\n")
-        return 1
-    except OSError as e:
-        sys.stderr.write(f"Ошибка при чтении '{INPUT_FILE}': {e}\n")
-        return 1
+    except (FileNotFoundError, json.JSONDecodeError):
+        # If file missing or invalid JSON, create/overwrite empty names.txt
+        output_file.write_text('', encoding='utf-8')
+        return
 
-    if not isinstance(data, list):
-        sys.stderr.write("Ошибка: ожидается JSON-массив в корне файла.\n")
-        return 1
+    names = []
 
-    names = extract_names(data)
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict) and 'name' in item and item['name'] is not None:
+                names.append(str(item['name']))
+    elif isinstance(data, dict):
+        # Fallback: try common container keys if root is not an array
+        for key in ('items', 'data', 'results'):
+            arr = data.get(key)
+            if isinstance(arr, list):
+                for item in arr:
+                    if isinstance(item, dict) and 'name' in item and item['name'] is not None:
+                        names.append(str(item['name']))
+                break
 
-    try:
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            if names:
-                f.write("\n".join(names) + "\n")
-            else:
-                # Пустой файл, если имён не найдено
-                f.write("")
-    except OSError as e:
-        sys.stderr.write(f"Ошибка при записи в '{OUTPUT_FILE}': {e}\n")
-        return 1
-
-    return 0
+    output_file.write_text('\n'.join(names), encoding='utf-8')
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    main()
